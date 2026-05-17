@@ -1,0 +1,27 @@
+[package]
+name = "rbm-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "rbinilspy MCP server binary"
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rmcp = { workspace = true }
+tokio = { workspace = true, features = ["process", "io-util", "sync"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+
+[[bin]]
+name = "rbinilspy"
+path = "src/main.rs"

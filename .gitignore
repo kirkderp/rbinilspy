@@ -1,0 +1,8 @@
+/target/
+rbinilspy-cache/
+ilspy-worker/bin/
+ilspy-worker/obj/
+*.swp
+*.swo
+*~
+.DS_Store
