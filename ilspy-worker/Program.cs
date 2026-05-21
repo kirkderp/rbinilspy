@@ -80,7 +80,7 @@ string IlspyCmd(string args)
     return stdout;
 }
 
-static List<MemberInfo> ParseMemberSignatures(string code)
+List<MemberInfo> ParseMemberSignatures(string code)
 {
     var members = new List<MemberInfo>();
     var lines = code.Split('\n');
@@ -99,9 +99,9 @@ static List<MemberInfo> ParseMemberSignatures(string code)
 
         // Skip type/interface/struct/enum/delegate declarations
         var trimmedForType = line;
-        foreach (var prefix in new[] { "public ", "private ", "internal ", "protected ", "protected internal ", "private protected " })
+        foreach (var prefix in ParseHelpers.AccessModifiers)
             if (trimmedForType.StartsWith(prefix)) { trimmedForType = trimmedForType[prefix.Length..]; break; }
-        foreach (var prefix in new[] { "static ", "abstract ", "sealed ", "readonly ", "unsafe ", "partial " })
+        foreach (var prefix in ParseHelpers.TypeModifiers)
             if (trimmedForType.StartsWith(prefix)) { trimmedForType = trimmedForType[prefix.Length..]; break; }
         if (trimmedForType.StartsWith("class ") || trimmedForType.StartsWith("struct ") ||
             trimmedForType.StartsWith("interface ") || trimmedForType.StartsWith("enum ") ||
@@ -110,10 +110,7 @@ static List<MemberInfo> ParseMemberSignatures(string code)
 
         // Match lines starting with access modifiers or member keywords
         bool isMember = false;
-        foreach (var prefix in new[] { "public ", "private ", "internal ", "protected ",
-            "protected internal ", "private protected ",
-            "static ", "virtual ", "override ", "abstract ", "sealed ",
-            "readonly ", "const ", "extern ", "new ", "unsafe ", "async " })
+        foreach (var prefix in ParseHelpers.MemberModifiers)
         {
             if (line.StartsWith(prefix)) { isMember = true; break; }
         }
@@ -731,3 +728,14 @@ class CachedAssembly
 }
 
 record NamespaceGroup(string ns, int count);
+// ⚡ Bolt Optimization: Use static arrays for modifiers instead of allocating new[] inside a hot loop (ParseMemberSignatures).
+// This avoids thousands of allocations per type parsed, significantly improving parsing speed and reducing GC pressure.
+public static class ParseHelpers
+{
+    public static readonly string[] AccessModifiers = { "public ", "private ", "internal ", "protected ", "protected internal ", "private protected " };
+    public static readonly string[] TypeModifiers = { "static ", "abstract ", "sealed ", "readonly ", "unsafe ", "partial " };
+    public static readonly string[] MemberModifiers = { "public ", "private ", "internal ", "protected ",
+        "protected internal ", "private protected ",
+        "static ", "virtual ", "override ", "abstract ", "sealed ",
+        "readonly ", "const ", "extern ", "new ", "unsafe ", "async " };
+}

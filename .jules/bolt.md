@@ -1,0 +1,3 @@
+## 2024-05-18 - C# Top-level statements and static arrays
+**Learning:** In C# top-level statements (Program.cs without a main method), standard `static readonly` arrays placed below method definitions cannot be easily referenced within local functions that precede them due to scoping issues. Furthermore, C# does not allow placing arrays inside methods as `static` directly unless using C# 8 static local functions, which also have scope rules.
+**Action:** When extracting arrays from hot loops in C# scripts with top-level statements, use a separate static class (e.g., `public static class ParseHelpers`) at the bottom of the file to hold the `static readonly` properties, to avoid top-level statement scoping issues.
