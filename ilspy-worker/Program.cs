@@ -53,25 +53,30 @@ while (true)
     }
 }
 
-string IlspyCmd(string args)
+string IlspyCmd(params string[] args)
 {
     var timeoutMs = 60000; // 60s default
     var envTimeout = Environment.GetEnvironmentVariable("RBM_ILSPY_CMD_TIMEOUT_MS");
     if (!string.IsNullOrEmpty(envTimeout) && int.TryParse(envTimeout, out var parsed) && parsed > 0)
         timeoutMs = parsed;
 
-    var psi = new ProcessStartInfo(ilspycmd, args)
+    var psi = new ProcessStartInfo(ilspycmd)
     {
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false,
     };
+    foreach (var arg in args)
+    {
+        psi.ArgumentList.Add(arg);
+    }
     using var proc = Process.Start(psi) ?? throw new Exception("failed to start ilspycmd");
     var completed = proc.WaitForExit(timeoutMs);
     if (!completed)
     {
         try { proc.Kill(); } catch { }
-        throw new Exception($"ilspycmd timed out after {timeoutMs}ms: {args[..Math.Min(args.Length, 100)]}");
+        var argsStr = string.Join(" ", args);
+        throw new Exception($"ilspycmd timed out after {timeoutMs}ms: {argsStr[..Math.Min(argsStr.Length, 100)]}");
     }
     var stdout = proc.StandardOutput.ReadToEnd();
     var stderr = proc.StandardError.ReadToEnd();
@@ -80,7 +85,8 @@ string IlspyCmd(string args)
     return stdout;
 }
 
-static List<MemberInfo> ParseMemberSignatures(string code)
+
+List<MemberInfo> ParseMemberSignatures(string code)
 {
     var members = new List<MemberInfo>();
     var lines = code.Split('\n');
@@ -99,9 +105,9 @@ static List<MemberInfo> ParseMemberSignatures(string code)
 
         // Skip type/interface/struct/enum/delegate declarations
         var trimmedForType = line;
-        foreach (var prefix in new[] { "public ", "private ", "internal ", "protected ", "protected internal ", "private protected " })
+        foreach (var prefix in ParseHelpers.AccessModifiers)
             if (trimmedForType.StartsWith(prefix)) { trimmedForType = trimmedForType[prefix.Length..]; break; }
-        foreach (var prefix in new[] { "static ", "abstract ", "sealed ", "readonly ", "unsafe ", "partial " })
+        foreach (var prefix in ParseHelpers.TypeModifiers)
             if (trimmedForType.StartsWith(prefix)) { trimmedForType = trimmedForType[prefix.Length..]; break; }
         if (trimmedForType.StartsWith("class ") || trimmedForType.StartsWith("struct ") ||
             trimmedForType.StartsWith("interface ") || trimmedForType.StartsWith("enum ") ||
@@ -110,10 +116,7 @@ static List<MemberInfo> ParseMemberSignatures(string code)
 
         // Match lines starting with access modifiers or member keywords
         bool isMember = false;
-        foreach (var prefix in new[] { "public ", "private ", "internal ", "protected ",
-            "protected internal ", "private protected ",
-            "static ", "virtual ", "override ", "abstract ", "sealed ",
-            "readonly ", "const ", "extern ", "new ", "unsafe ", "async " })
+        foreach (var prefix in ParseHelpers.MemberModifiers)
         {
             if (line.StartsWith(prefix)) { isMember = true; break; }
         }
@@ -208,7 +211,7 @@ static TypeInfo ParseTypeName(string raw)
 
 CachedAssembly LoadAssembly(string path, string sid)
 {
-    var output = IlspyCmd($"-l class \"{path}\"");
+    var output = IlspyCmd("-l", "class", path);
     var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
 
@@ -337,7 +340,7 @@ object DecompileType(JsonElement prms)
             return new { type_name = typeName, code = cachedCode, cached = true };
     }
 
-    var output = IlspyCmd($"-t \"{typeName}\" \"{ap}\"");
+    var output = IlspyCmd("-t", typeName, ap);
 
     // Cache result
     if (sid != null && sessions.TryGetValue(sid, out var cacheTarget))
@@ -350,7 +353,7 @@ object GetIL(JsonElement prms)
 {
     var typeName = GetString(prms, "type_name") ?? throw new ArgumentException("type_name required");
     var ap = ResolvePath(prms);
-    var output = IlspyCmd($"-il -t \"{typeName}\" \"{ap}\"");
+    var output = IlspyCmd("-il", "-t", typeName, ap);
     return new { type_name = typeName, il = output };
 }
 
@@ -368,7 +371,7 @@ object GetMetadata(JsonElement prms)
 object ListResources(JsonElement prms)
 {
     var ap = ResolvePath(prms);
-    var output = IlspyCmd($"-l resource \"{ap}\"");
+    var output = IlspyCmd("-l", "resource", ap);
     var resources = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(t => !string.IsNullOrEmpty(t)).ToList();
     return new { resource_count = resources.Count, resources };
@@ -387,7 +390,7 @@ object ListMembers(JsonElement prms)
             return new { type_name = typeName, member_count = cachedMembers.Count, members = cachedMembers, cached = true };
     }
 
-    var output = IlspyCmd($"-t \"{typeName}\" \"{ap}\"");
+    var output = IlspyCmd("-t", typeName, ap);
     var members = ParseMemberSignatures(output);
 
     // Cache result
@@ -460,7 +463,7 @@ object TypeInfo(JsonElement prms)
     var ap = ResolvePath(prms);
 
     // Decompile the type and extract type-level metadata
-    var output = IlspyCmd($"-t \"{typeName}\" \"{ap}\"");
+    var output = IlspyCmd("-t", typeName, ap);
     var lines = output.Split('\n');
 
     // Find the class/struct/interface declaration line
@@ -544,7 +547,7 @@ object GetMethodSource(JsonElement prms)
         code = cachedCode;
     else
     {
-        code = IlspyCmd($"-t \"{typeName}\" \"{ap}\"");
+        code = IlspyCmd("-t", typeName, ap);
         if (sid != null && sessions.TryGetValue(sid, out var c))
             c.Decompiled[typeName] = code;
     }
@@ -611,7 +614,7 @@ object SearchSource(JsonElement prms)
         code = cachedCode;
     else
     {
-        code = IlspyCmd($"-t \"{typeName}\" \"{ap}\"");
+        code = IlspyCmd("-t", typeName, ap);
         if (sid != null && sessions.TryGetValue(sid, out var c))
             c.Decompiled[typeName] = code;
     }
@@ -634,7 +637,40 @@ object RunRawCmd(JsonElement prms)
 {
     var args = GetString(prms, "args") ?? throw new ArgumentException("args required");
     var ap = ResolvePath(prms);
-    var output = IlspyCmd($"{args} \"{ap}\"");
+
+    var parsedArgs = new List<string>();
+    var currentArg = new System.Text.StringBuilder();
+    bool inQuotes = false;
+
+    for (int i = 0; i < args.Length; i++)
+    {
+        char c = args[i];
+
+        if (c == '"')
+        {
+            inQuotes = !inQuotes;
+        }
+        else if (char.IsWhiteSpace(c) && !inQuotes)
+        {
+            if (currentArg.Length > 0)
+            {
+                parsedArgs.Add(currentArg.ToString());
+                currentArg.Clear();
+            }
+        }
+        else
+        {
+            currentArg.Append(c);
+        }
+    }
+
+    if (currentArg.Length > 0)
+    {
+        parsedArgs.Add(currentArg.ToString());
+    }
+    parsedArgs.Add(ap);
+
+    var output = IlspyCmd(parsedArgs.ToArray());
     return new { command = $"{args} {ap}", output };
 }
 
@@ -731,3 +767,14 @@ class CachedAssembly
 }
 
 record NamespaceGroup(string ns, int count);
+
+public static class ParseHelpers
+{
+    public static readonly string[] AccessModifiers = { "public ", "private ", "internal ", "protected ", "protected internal ", "private protected " };
+    public static readonly string[] TypeModifiers = { "static ", "abstract ", "sealed ", "readonly ", "unsafe ", "partial " };
+    public static readonly string[] MemberModifiers = { "public ", "private ", "internal ", "protected ",
+        "protected internal ", "private protected ",
+        "static ", "virtual ", "override ", "abstract ", "sealed ",
+        "readonly ", "const ", "extern ", "new ", "unsafe ", "async " };
+}
+
