@@ -1,0 +1,3 @@
+## 2024-05-22 - Avoid ToLowerInvariant inside hot loops in C#
+**Learning:** Using `ToLowerInvariant()` inside a hot loop (like scanning every line of a decompiled source file) allocates a new string object on the heap for every line. This can drastically increase memory consumption and slow down execution due to garbage collection overhead.
+**Action:** Replace `string.ToLowerInvariant().Contains(other.ToLowerInvariant())` with `string.Contains(other, StringComparison.OrdinalIgnoreCase)` in any C# searching operations, especially over large codebases or logs, to prevent unnecessary string allocations.

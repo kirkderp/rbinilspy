@@ -619,12 +619,12 @@ object SearchSource(JsonElement prms)
             c.Decompiled[typeName] = code;
     }
 
-    var lowerPat = pattern.ToLowerInvariant();
     var lines = code.Split('\n');
     var matches = new List<object>();
     for (var i = 0; i < lines.Length; i++)
     {
-        if (lines[i].ToLowerInvariant().Contains(lowerPat))
+        // ⚡ Bolt: Avoid allocating string on every line, use OrdinalIgnoreCase directly
+        if (lines[i].Contains(pattern, StringComparison.OrdinalIgnoreCase))
         {
             matches.Add(new { line = i + 1, text = lines[i].Trim() });
         }
