@@ -1,0 +1,4 @@
+## 2025-05-22 - [Argument Injection in Worker CLI Passthrough]
+**Vulnerability:** The `RunRawCmd` method allowed arbitrary arguments to be passed directly to the `ilspycmd` process, introducing a risk of arbitrary file write/overwrite if dangerous arguments like `-o` (output dir) or `-p` (project file) are used.
+**Learning:** Argument injection risks exist not only at shell levels but when forwarding structured arguments to underlying tools with dangerous flags. Exact string match filters can be easily bypassed using `=` or `:` syntax for CLI arguments.
+**Prevention:** Always validate all user-supplied CLI arguments using an explicit allowlist or a robust blocklist that accounts for multiple assignment syntax variations (`-flag=val`, `-flag:val`, `-flag val`) before passing to `ProcessStartInfo`.

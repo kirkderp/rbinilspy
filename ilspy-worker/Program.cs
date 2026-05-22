@@ -668,6 +668,22 @@ object RunRawCmd(JsonElement prms)
     {
         parsedArgs.Add(currentArg.ToString());
     }
+
+    // SECURITY 🛡️: Prevent arbitrary file write/overwrite and unintended tool execution
+    var dangerousArgs = new[] { "-o", "--outputdir", "-p", "--project", "-d", "--dump-package", "-genpdb", "--generate-pdb", "--generate-diagrammer" };
+    foreach (var arg in parsedArgs)
+    {
+        foreach (var dangerous in dangerousArgs)
+        {
+            if (arg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+            }
+        }
+    }
+
     parsedArgs.Add(ap);
 
     var output = IlspyCmd(parsedArgs.ToArray());
