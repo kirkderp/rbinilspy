@@ -668,6 +668,17 @@ object RunRawCmd(JsonElement prms)
     {
         parsedArgs.Add(currentArg.ToString());
     }
+
+    // Security: prevent arbitrary file write/overwrite
+    var blockedArgs = new[] { "-o", "--outputdir", "-d", "--dump-package", "-p", "--project", "--generate-diagrammer" };
+    foreach (var parsedArg in parsedArgs)
+    {
+        if (blockedArgs.Contains(parsedArg))
+        {
+            throw new ArgumentException($"security: blocked argument '{parsedArg}' which could result in file writes.");
+        }
+    }
+
     parsedArgs.Add(ap);
 
     var output = IlspyCmd(parsedArgs.ToArray());
