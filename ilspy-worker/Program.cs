@@ -619,15 +619,17 @@ object SearchSource(JsonElement prms)
             c.Decompiled[typeName] = code;
     }
 
-    var lowerPat = pattern.ToLowerInvariant();
-    var lines = code.Split('\n');
+    // ⚡ Bolt: Zero-allocation line iteration prevents creating string[] and multiple ToLower copies
+    // Performance impact: Reduces GC pressure significantly when scanning large decompiled types
     var matches = new List<object>();
-    for (var i = 0; i < lines.Length; i++)
+    var lineNum = 1;
+    foreach (var lineSpan in code.AsSpan().EnumerateLines())
     {
-        if (lines[i].ToLowerInvariant().Contains(lowerPat))
+        if (lineSpan.Contains(pattern, StringComparison.OrdinalIgnoreCase))
         {
-            matches.Add(new { line = i + 1, text = lines[i].Trim() });
+            matches.Add(new { line = lineNum, text = lineSpan.Trim().ToString() });
         }
+        lineNum++;
     }
 
     return new { type_name = typeName, pattern, total_matches = matches.Count, matches = matches.Take(50).ToList() };
@@ -697,12 +699,17 @@ object FindUsages(JsonElement prms)
             continue; // skip types we haven't decompiled yet
 
         searchedTypes++;
-        var lines = code.Split('\n');
+        // ⚡ Bolt: Zero-allocation line iteration prevents creating string[] per type searched
+        // Performance impact: Reduces memory usage and GC overhead during bulk usage searches
         var matches = new List<object>();
-        for (var i = 0; i < lines.Length; i++)
+        var lineNum = 1;
+        foreach (var lineSpan in code.AsSpan().EnumerateLines())
         {
-            if (lines[i].Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                matches.Add(new { line = i + 1, text = lines[i].Trim() });
+            if (lineSpan.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                matches.Add(new { line = lineNum, text = lineSpan.Trim().ToString() });
+            }
+            lineNum++;
         }
 
         if (matches.Count > 0)
