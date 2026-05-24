@@ -240,6 +240,8 @@ CachedAssembly GetOrOpen(JsonElement prms)
     if (sid != null && sessions.TryGetValue(sid, out var cached))
         return cached;
     var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
     sid = sid ?? Path.GetFileName(path);
     return LoadAssembly(path, sid);
 }
@@ -247,6 +249,8 @@ CachedAssembly GetOrOpen(JsonElement prms)
 object OpenAssembly(JsonElement prms)
 {
     var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("assembly_path required");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
     var sid = GetString(prms, "session_id") ?? Path.GetFileName(path);
 
     if (sessions.ContainsKey(sid))
@@ -673,6 +677,11 @@ object RunRawCmd(JsonElement prms)
     var dangerousArgs = new[] { "-o", "--outputdir", "-p", "--project", "-d", "--dump-package", "-genpdb", "--generate-pdb", "--generate-diagrammer" };
     foreach (var arg in parsedArgs)
     {
+        if (arg.StartsWith("@"))
+        {
+            throw new ArgumentException("response files (@) are not allowed");
+        }
+
         foreach (var dangerous in dangerousArgs)
         {
             if (arg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
@@ -736,7 +745,10 @@ string ResolvePath(JsonElement prms)
     var sid = GetString(prms, "session_id");
     if (sid != null && sessions.TryGetValue(sid, out var cached))
         return cached.Path;
-    return GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
+    return path;
 }
 
 void WriteResult(JsonElement id, object result)
