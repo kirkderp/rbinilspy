@@ -619,15 +619,15 @@ object SearchSource(JsonElement prms)
             c.Decompiled[typeName] = code;
     }
 
-    var lowerPat = pattern.ToLowerInvariant();
-    var lines = code.Split('\n');
     var matches = new List<object>();
-    for (var i = 0; i < lines.Length; i++)
+    var lineNum = 1;
+    foreach (var lineSpan in code.AsSpan().EnumerateLines())
     {
-        if (lines[i].ToLowerInvariant().Contains(lowerPat))
+        if (lineSpan.Contains(pattern, StringComparison.OrdinalIgnoreCase))
         {
-            matches.Add(new { line = i + 1, text = lines[i].Trim() });
+            matches.Add(new { line = lineNum, text = lineSpan.Trim().ToString() });
         }
+        lineNum++;
     }
 
     return new { type_name = typeName, pattern, total_matches = matches.Count, matches = matches.Take(50).ToList() };
@@ -668,6 +668,22 @@ object RunRawCmd(JsonElement prms)
     {
         parsedArgs.Add(currentArg.ToString());
     }
+
+    // Security: Prevent arbitrary file write/overwrite and unintended tool execution
+    var dangerousArgs = new[] { "-o", "--outputdir", "-p", "--project", "-d", "--dump-package", "-genpdb", "--generate-pdb", "--generate-diagrammer" };
+    foreach (var arg in parsedArgs)
+    {
+        foreach (var dangerous in dangerousArgs)
+        {
+            if (arg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+            }
+        }
+    }
+
     parsedArgs.Add(ap);
 
     var output = IlspyCmd(parsedArgs.ToArray());
@@ -697,12 +713,15 @@ object FindUsages(JsonElement prms)
             continue; // skip types we haven't decompiled yet
 
         searchedTypes++;
-        var lines = code.Split('\n');
         var matches = new List<object>();
-        for (var i = 0; i < lines.Length; i++)
+        var lineNum = 1;
+        foreach (var lineSpan in code.AsSpan().EnumerateLines())
         {
-            if (lines[i].Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                matches.Add(new { line = i + 1, text = lines[i].Trim() });
+            if (lineSpan.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                matches.Add(new { line = lineNum, text = lineSpan.Trim().ToString() });
+            }
+            lineNum++;
         }
 
         if (matches.Count > 0)
