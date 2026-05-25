@@ -670,16 +670,21 @@ object RunRawCmd(JsonElement prms)
     }
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
-    var dangerousArgs = new[] { "-o", "--outputdir", "-p", "--project", "-d", "--dump-package", "-genpdb", "--generate-pdb", "--generate-diagrammer" };
+    // Normalize arguments by stripping leading - or / to catch variants like /o, --o, etc.
+    var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
     foreach (var arg in parsedArgs)
     {
-        foreach (var dangerous in dangerousArgs)
+        if (arg.StartsWith('-') || arg.StartsWith('/'))
         {
-            if (arg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                arg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                arg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+            var normalizedArg = arg.TrimStart('-', '/');
+            foreach (var dangerous in dangerousOptions)
             {
-                throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                }
             }
         }
     }
