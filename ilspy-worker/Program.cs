@@ -212,8 +212,7 @@ static TypeInfo ParseTypeName(string raw)
 CachedAssembly LoadAssembly(string path, string sid)
 {
     var output = IlspyCmd("-l", "class", path);
-    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     if (lines.Count == 0 || lines.All(e => e.StartsWith("Specify") || e.StartsWith("Usage")))
         throw new Exception($"ilspycmd returned no valid types for: {path}");
@@ -291,14 +290,15 @@ object ListNamespaces(JsonElement prms)
     if (!string.IsNullOrEmpty(filter))
         filtered = filtered.Where(n => n.ns.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
-    var total = filtered.Count();
-    if (limit > 0) filtered = filtered.Skip(offset).Take(limit);
+    var filteredList = filtered.ToList();
+    var total = filteredList.Count;
+    var paged = limit > 0 ? filteredList.Skip(offset).Take(limit) : filteredList;
 
     return new
     {
         total_matched = total,
-        returned = filtered.Count(),
-        namespaces = filtered.Select(n => new { @namespace = n.ns, type_count = n.count }).ToList(),
+        returned = paged.Count(),
+        namespaces = paged.Select(n => new { @namespace = n.ns, type_count = n.count }).ToList(),
     };
 }
 
@@ -316,14 +316,15 @@ object ListTypes(JsonElement prms)
     if (!string.IsNullOrEmpty(ns))
         filtered = filtered.Where(t => t.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
 
-    var total = filtered.Count();
-    if (limit > 0) filtered = filtered.Skip(offset).Take(limit);
+    var filteredList = filtered.ToList();
+    var total = filteredList.Count;
+    var paged = limit > 0 ? filteredList.Skip(offset).Take(limit) : filteredList;
 
     return new
     {
         total_matched = total,
-        returned = filtered.Count(),
-        types = filtered.Select(t => new { name = t.FullName, kind = t.Kind, ns = t.Namespace }).ToList(),
+        returned = paged.Count(),
+        types = paged.Select(t => new { name = t.FullName, kind = t.Kind, ns = t.Namespace }).ToList(),
     };
 }
 
@@ -372,8 +373,7 @@ object ListResources(JsonElement prms)
 {
     var ap = ResolvePath(prms);
     var output = IlspyCmd("-l", "resource", ap);
-    var resources = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Where(t => !string.IsNullOrEmpty(t)).ToList();
+    var resources = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     return new { resource_count = resources.Count, resources };
 }
 
