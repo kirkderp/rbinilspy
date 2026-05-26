@@ -289,7 +289,7 @@ object ListNamespaces(JsonElement prms)
 
     var filtered = cached.NamespaceGroups.AsEnumerable();
     if (!string.IsNullOrEmpty(filter))
-        filtered = filtered.Where(n => n.ns.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        filtered = filtered.Where(n => n.ns.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
 
     var total = filtered.Count();
     if (limit > 0) filtered = filtered.Skip(offset).Take(limit);
@@ -311,10 +311,15 @@ object ListTypes(JsonElement prms)
     var ns = GetString(prms, "namespace") ?? "";
 
     IEnumerable<TypeInfo> filtered = cached.Types;
-    if (!string.IsNullOrEmpty(filter))
-        filtered = filtered.Where(t => t.FullName.Contains(filter, StringComparison.OrdinalIgnoreCase));
-    if (!string.IsNullOrEmpty(ns))
-        filtered = filtered.Where(t => t.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
+    if (!string.IsNullOrEmpty(filter) || !string.IsNullOrEmpty(ns))
+    {
+        if (!string.IsNullOrEmpty(filter))
+            filtered = filtered.Where(t => t.FullName.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(ns))
+            filtered = filtered.Where(t => t.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
+
+        filtered = filtered.ToList();
+    }
 
     var total = filtered.Count();
     if (limit > 0) filtered = filtered.Skip(offset).Take(limit);

@@ -1,0 +1,4 @@
+## 2024-05-24 - Multiple Enumeration of LINQ Queries
+
+**Learning:** In C#, LINQ queries returning `IEnumerable<T>` evaluate lazily. When methods like `Count()`, `Skip()`, `Take()`, or `Select()` are chained to a single `IEnumerable<T>` derived from a `.Where()` filter, the filter function executes from scratch for each invocation. In `ListTypes` and `ListNamespaces`, string-comparison filters were executed multiple times because `filtered.Count()` was called twice (for `total_matched` and `returned`), followed by an iteration.
+**Action:** When applying expensive filters (like string comparisons) to an in-memory collection via LINQ and then accessing multiple aggregate properties or iterating over the result multiple times, always materialize the filtered sequence into a collection like a `List<T>` or array using `.ToList()` or `.ToArray()` before querying it further.
