@@ -212,8 +212,7 @@ static TypeInfo ParseTypeName(string raw)
 CachedAssembly LoadAssembly(string path, string sid)
 {
     var output = IlspyCmd("-l", "class", path);
-    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     if (lines.Count == 0 || lines.All(e => e.StartsWith("Specify") || e.StartsWith("Usage")))
         throw new Exception($"ilspycmd returned no valid types for: {path}");
@@ -240,6 +239,8 @@ CachedAssembly GetOrOpen(JsonElement prms)
     if (sid != null && sessions.TryGetValue(sid, out var cached))
         return cached;
     var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
     sid = sid ?? Path.GetFileName(path);
     return LoadAssembly(path, sid);
 }
@@ -247,6 +248,8 @@ CachedAssembly GetOrOpen(JsonElement prms)
 object OpenAssembly(JsonElement prms)
 {
     var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("assembly_path required");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
     var sid = GetString(prms, "session_id") ?? Path.GetFileName(path);
 
     if (sessions.ContainsKey(sid))
@@ -291,14 +294,15 @@ object ListNamespaces(JsonElement prms)
     if (!string.IsNullOrEmpty(filter))
         filtered = filtered.Where(n => n.ns.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
-    var total = filtered.Count();
-    if (limit > 0) filtered = filtered.Skip(offset).Take(limit);
+    var filteredList = filtered.ToList();
+    var total = filteredList.Count;
+    var paged = limit > 0 ? filteredList.Skip(offset).Take(limit) : filteredList;
 
     return new
     {
         total_matched = total,
-        returned = filtered.Count(),
-        namespaces = filtered.Select(n => new { @namespace = n.ns, type_count = n.count }).ToList(),
+        returned = paged.Count(),
+        namespaces = paged.Select(n => new { @namespace = n.ns, type_count = n.count }).ToList(),
     };
 }
 
@@ -316,14 +320,15 @@ object ListTypes(JsonElement prms)
     if (!string.IsNullOrEmpty(ns))
         filtered = filtered.Where(t => t.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
 
-    var total = filtered.Count();
-    if (limit > 0) filtered = filtered.Skip(offset).Take(limit);
+    var filteredList = filtered.ToList();
+    var total = filteredList.Count;
+    var paged = limit > 0 ? filteredList.Skip(offset).Take(limit) : filteredList;
 
     return new
     {
         total_matched = total,
-        returned = filtered.Count(),
-        types = filtered.Select(t => new { name = t.FullName, kind = t.Kind, ns = t.Namespace }).ToList(),
+        returned = paged.Count(),
+        types = paged.Select(t => new { name = t.FullName, kind = t.Kind, ns = t.Namespace }).ToList(),
     };
 }
 
@@ -372,8 +377,7 @@ object ListResources(JsonElement prms)
 {
     var ap = ResolvePath(prms);
     var output = IlspyCmd("-l", "resource", ap);
-    var resources = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Where(t => !string.IsNullOrEmpty(t)).ToList();
+    var resources = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     return new { resource_count = resources.Count, resources };
 }
 
@@ -670,16 +674,25 @@ object RunRawCmd(JsonElement prms)
     }
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
-    var dangerousArgs = new[] { "-o", "--outputdir", "-p", "--project", "-d", "--dump-package", "-genpdb", "--generate-pdb", "--generate-diagrammer" };
+    var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
     foreach (var arg in parsedArgs)
     {
-        foreach (var dangerous in dangerousArgs)
+        if (arg.StartsWith("@"))
         {
-            if (arg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                arg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                arg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("response files (@) are not allowed");
+        }
+
+        if (arg.StartsWith('-') || arg.StartsWith('/'))
+        {
+            var normalizedArg = arg.TrimStart('-', '/');
+            foreach (var dangerous in dangerousOptions)
             {
-                throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                }
             }
         }
     }
@@ -736,7 +749,10 @@ string ResolvePath(JsonElement prms)
     var sid = GetString(prms, "session_id");
     if (sid != null && sessions.TryGetValue(sid, out var cached))
         return cached.Path;
-    return GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    var path = GetString(prms, "assembly_path") ?? throw new ArgumentException("session_id not found. open the assembly first or provide assembly_path");
+    if (path.StartsWith("-") || path.StartsWith("@"))
+        throw new ArgumentException("invalid assembly_path");
+    return path;
 }
 
 void WriteResult(JsonElement id, object result)
