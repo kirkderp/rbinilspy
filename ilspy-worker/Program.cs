@@ -687,9 +687,8 @@ object RunRawCmd(JsonElement prms)
             var normalizedArg = arg.TrimStart('-', '/');
             foreach (var dangerous in dangerousOptions)
             {
-                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                if (normalizedArg.StartsWith(dangerous, StringComparison.OrdinalIgnoreCase) &&
+                    (normalizedArg.Length == dangerous.Length || !char.IsLetterOrDigit(normalizedArg[dangerous.Length])))
                 {
                     throw new ArgumentException($"dangerous or unsupported argument: {arg}");
                 }

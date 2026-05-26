@@ -1,0 +1,4 @@
+## 2024-05-30 - Command Injection / Argument Bypass
+**Vulnerability:** Argument parsing loop in C# `ilspy-worker/Program.cs` `RunRawCmd` extracts args and checks against a blocklist of dangerous args (`-o`, `-p`, etc). The check didn't handle args like `-o"/tmp"` or `-o/tmp` effectively, relying only on exact match, or checking if it started with `=`/`:`. This allows executing dangerous commands with output writing using arguments like `-o/tmp` or `--outputdir/tmp` which bypassed the rudimentary `StartsWith(dangerous + "=")` checks.
+**Learning:** Argument blocklisting is brittle. Prefix checks must account for the lack of spaces or separators in many command line argument parsers.
+**Prevention:** Check if the normalized argument string begins with the dangerous option *and* is followed by any character (or nothing), e.g., using `StartsWith` with the string directly or using `GetRawText`. Alternatively restrict the command list.
