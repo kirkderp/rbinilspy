@@ -1,0 +1,3 @@
+## 2024-05-27 - Cache C# Decompilation
+**Learning:** In the `ilspy-worker` C# project, multiple methods (`TypeInfo`, `DecompileType`, `GetMethodSource`, `SearchSource`, etc.) need access to decompiled class structures. By default, `ilspycmd` performs an expensive OS-level subprocess execution for every request.
+**Action:** The C# worker relies on caching (e.g., `CachedAssembly.Decompiled` and `CachedAssembly.Members` dictionaries) to minimize expensive external calls to the `ilspycmd` subprocess. Always verify and utilize these cache structures before invoking `ilspycmd` to avoid redundant OS-level executions.
