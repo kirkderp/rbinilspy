@@ -394,7 +394,18 @@ object ListMembers(JsonElement prms)
             return new { type_name = typeName, member_count = cachedMembers.Count, members = cachedMembers, cached = true };
     }
 
-    var output = IlspyCmd("-t", typeName, ap);
+    string output;
+    if (sid != null && sessions.TryGetValue(sid, out var session) && session.Decompiled.TryGetValue(typeName, out var cachedCode))
+    {
+        output = cachedCode;
+    }
+    else
+    {
+        output = IlspyCmd("-t", typeName, ap);
+        if (sid != null && sessions.TryGetValue(sid, out var cacheTargetForDecompiled))
+            cacheTargetForDecompiled.Decompiled[typeName] = output;
+    }
+
     var members = ParseMemberSignatures(output);
 
     // Cache result
@@ -465,9 +476,21 @@ object TypeInfo(JsonElement prms)
 {
     var typeName = GetString(prms, "type_name") ?? throw new ArgumentException("type_name required");
     var ap = ResolvePath(prms);
+    var sid = GetString(prms, "session_id");
+
+    string output;
+    if (sid != null && sessions.TryGetValue(sid, out var cached) && cached.Decompiled.TryGetValue(typeName, out var cachedCode))
+    {
+        output = cachedCode;
+    }
+    else
+    {
+        output = IlspyCmd("-t", typeName, ap);
+        if (sid != null && sessions.TryGetValue(sid, out var cacheTarget))
+            cacheTarget.Decompiled[typeName] = output;
+    }
 
     // Decompile the type and extract type-level metadata
-    var output = IlspyCmd("-t", typeName, ap);
     var lines = output.Split('\n');
 
     // Find the class/struct/interface declaration line
