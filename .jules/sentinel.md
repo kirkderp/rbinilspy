@@ -1,0 +1,4 @@
+## 2024-05-28 - Secure Validation of Subprocess Command Line Flags
+**Vulnerability:** Command-line argument blocklists that only match on full flag names or `=` delimiters can be bypassed by concatenating the short flag with a parameter value, e.g., `-o/tmp` or `-o:tmp`.
+**Learning:** Argument validation for subprocess invocation must explicitly handle boundary checks for the short/concatenated variations, or it can be easily circumvented resulting in unauthorized file execution or directory access.
+**Prevention:** Instead of merely matching the exact string or `=` / `:` strings, when a blocked option prefix matches, check that the character immediately following the prefix is non-alphanumeric. If it's non-alphanumeric (like `/`, `:`, `=`), the parameter applies to the blocked prefix and the argument should be rejected.
