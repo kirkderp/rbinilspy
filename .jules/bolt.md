@@ -1,0 +1,3 @@
+## 2024-05-29 - Cache Decompiled Output for TypeInfo
+**Learning:** In the `ilspy-worker` C# process, `ilspycmd` executions are extremely expensive OS-level subprocess calls. Methods like `TypeInfo` were needlessly re-invoking `ilspycmd` to fetch full decompilations when the data was already cached in `CachedAssembly.Decompiled` from prior calls (e.g., `DecompileType` or `GetMethodSource`).
+**Action:** Always leverage the `sessions[sid].Decompiled` and `sessions[sid].Members` caches for any type-level operations (like fetching type info or members) before invoking the CLI to dramatically reduce response times and CPU overhead.

@@ -466,8 +466,22 @@ object TypeInfo(JsonElement prms)
     var typeName = GetString(prms, "type_name") ?? throw new ArgumentException("type_name required");
     var ap = ResolvePath(prms);
 
-    // Decompile the type and extract type-level metadata
-    var output = IlspyCmd("-t", typeName, ap);
+    // Check decompile cache
+    var sid = GetString(prms, "session_id");
+    string output;
+    if (sid != null && sessions.TryGetValue(sid, out var cached) && cached.Decompiled.TryGetValue(typeName, out var cachedCode))
+    {
+        output = cachedCode;
+    }
+    else
+    {
+        output = IlspyCmd("-t", typeName, ap);
+        if (sid != null && sessions.TryGetValue(sid, out var cacheTarget))
+        {
+            cacheTarget.Decompiled[typeName] = output;
+        }
+    }
+
     var lines = output.Split('\n');
 
     // Find the class/struct/interface declaration line
