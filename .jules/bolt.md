@@ -1,0 +1,3 @@
+## 2024-05-30 - Caching Subprocess Output
+**Learning:** Found that multiple worker methods in `ilspy-worker/Program.cs` (`TypeInfo` and `ListMembers`) were missing checks against the existing `CachedAssembly.Decompiled` cache. Because these operations relied on the expensive `ilspycmd` subprocess, failing to utilize the central cache resulted in repeated OS-level executions for the same type.
+**Action:** Always ensure that read-heavy data fetching operations check existing cache structures (`CachedAssembly.Decompiled`) before falling back to expensive subprocess execution, and cache the result if it isn't already.
