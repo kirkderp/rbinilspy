@@ -675,6 +675,8 @@ object RunRawCmd(JsonElement prms)
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
     var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
+    var safeOptionsStartingWithDangerous = new[] { "ds", "decompiler-setting", "disable-updatecheck", "decompile-baml" };
+
     foreach (var arg in parsedArgs)
     {
         if (arg.StartsWith("@"))
@@ -685,13 +687,41 @@ object RunRawCmd(JsonElement prms)
         if (arg.StartsWith('-') || arg.StartsWith('/'))
         {
             var normalizedArg = arg.TrimStart('-', '/');
+
+            bool isSafeOverride = false;
+            foreach (var safe in safeOptionsStartingWithDangerous)
+            {
+                if (normalizedArg.Equals(safe, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(safe + "=", StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(safe + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    isSafeOverride = true;
+                    break;
+                }
+            }
+            if (isSafeOverride) continue;
+
             foreach (var dangerous in dangerousOptions)
             {
-                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                if (normalizedArg.StartsWith(dangerous, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                    if (normalizedArg.Length == dangerous.Length)
+                    {
+                        throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                    }
+
+                    char nextChar = normalizedArg[dangerous.Length];
+                    if (!char.IsLetterOrDigit(nextChar) && nextChar != '-' && nextChar != '_')
+                    {
+                        throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                    }
+
+                    // For single-character dangerous options (-o, -p, -d), any following character
+                    // is treated as a concatenated value by System.CommandLine bundling.
+                    if (dangerous.Length == 1)
+                    {
+                        throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                    }
                 }
             }
         }
