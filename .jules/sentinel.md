@@ -1,0 +1,4 @@
+## 2024-05-31 - [Fix POSIX Option Bundling Blocklist Bypass]
+**Vulnerability:** The C# worker used simple string validation (`StartsWith(dangerousOption)`) to block potentially dangerous options passed to `ilspycmd`. This was insufficient as it allowed POSIX-style option bundling bypasses (e.g., `-otmp/path` combining the dangerous short option `-o` with its value) and similar obfuscations to run unintended commands.
+**Learning:** Checking for boundary characters (`=`, `:`) or exact string matches is not enough when CLI tools support concatenating single-character short options directly with their values.
+**Prevention:** Explicitly distinguish short and long option processing. For short options, verify the initial character(s) against dangerous short options rather than doing an exact string check on the entire token. Always map out and allow specific safe options that might share prefixes to prevent false positives.

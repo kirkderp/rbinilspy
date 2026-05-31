@@ -674,7 +674,10 @@ object RunRawCmd(JsonElement prms)
     }
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
-    var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
+    var dangerousShort = new[] { "o", "p", "d" };
+    var dangerousLong = new[] { "outputdir", "project", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
+    var safeOverrides = new[] { "ds", "decompiler-setting", "disable-updatecheck", "decompile-baml" };
+
     foreach (var arg in parsedArgs)
     {
         if (arg.StartsWith("@"))
@@ -685,11 +688,26 @@ object RunRawCmd(JsonElement prms)
         if (arg.StartsWith('-') || arg.StartsWith('/'))
         {
             var normalizedArg = arg.TrimStart('-', '/');
-            foreach (var dangerous in dangerousOptions)
+            var baseOption = normalizedArg;
+            var sepIdx = baseOption.IndexOfAny(new[] { '=', ':' });
+            if (sepIdx >= 0)
             {
-                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                baseOption = baseOption[..sepIdx];
+            }
+
+            if (safeOverrides.Contains(baseOption, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (dangerousLong.Contains(baseOption, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+            }
+
+            foreach (var ds in dangerousShort)
+            {
+                if (baseOption.StartsWith(ds, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new ArgumentException($"dangerous or unsupported argument: {arg}");
                 }
