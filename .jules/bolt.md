@@ -1,0 +1,3 @@
+## 2026-05-31 - Missing CachedAssembly.Decompiled cache utilization in C# ilspy-worker
+**Learning:** Found that `ListMembers` and `TypeInfo` methods in `ilspy-worker/Program.cs` invoked the expensive `ilspycmd -t <type>` OS process redundantly, without checking if the code had already been decompiled and stored in `CachedAssembly.Decompiled`, and they also didn't save their output into the cache. This is a codebase-specific pattern where OS executions are heavily optimized via an in-memory dictionary cache.
+**Action:** Always verify if a method that spawns an external process (like `ilspycmd`) can be short-circuited by looking up existing data in `CachedAssembly.Decompiled` (or similar `CachedAssembly` structures) when a `session_id` is available.
