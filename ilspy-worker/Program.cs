@@ -675,6 +675,8 @@ object RunRawCmd(JsonElement prms)
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
     var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
+    var safePrefixes = new[] { "disable", "decompile", "ds", "decompiler-setting" };
+
     foreach (var arg in parsedArgs)
     {
         if (arg.StartsWith("@"))
@@ -685,13 +687,33 @@ object RunRawCmd(JsonElement prms)
         if (arg.StartsWith('-') || arg.StartsWith('/'))
         {
             var normalizedArg = arg.TrimStart('-', '/');
+            var splitIdx = normalizedArg.IndexOfAny(new[] { '=', ':' });
+            var argKey = splitIdx > 0 ? normalizedArg.Substring(0, splitIdx) : normalizedArg;
+
             foreach (var dangerous in dangerousOptions)
             {
-                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
-                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(argKey, dangerous, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                }
+
+                // Handle POSIX short option bundling (e.g. -otmp for -o)
+                if (dangerous.Length == 1 && argKey.StartsWith(dangerous, StringComparison.OrdinalIgnoreCase))
+                {
+                    bool isSafePrefix = false;
+                    foreach (var safePrefix in safePrefixes)
+                    {
+                        if (argKey.StartsWith(safePrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            isSafePrefix = true;
+                            break;
+                        }
+                    }
+
+                    if (!isSafePrefix)
+                    {
+                        throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                    }
                 }
             }
         }
