@@ -675,6 +675,9 @@ object RunRawCmd(JsonElement prms)
 
     // Security: Prevent arbitrary file write/overwrite and unintended tool execution
     var dangerousOptions = new[] { "o", "outputdir", "p", "project", "d", "dump-package", "genpdb", "generate-pdb", "generate-diagrammer" };
+    var dangerousShort = new[] { "o", "p", "d" };
+    var safeShortPrefixes = new[] { "ds", "decompile", "disable" };
+
     foreach (var arg in parsedArgs)
     {
         if (arg.StartsWith("@"))
@@ -682,14 +685,48 @@ object RunRawCmd(JsonElement prms)
             throw new ArgumentException("response files (@) are not allowed");
         }
 
-        if (arg.StartsWith('-') || arg.StartsWith('/'))
+        if (arg.StartsWith("--"))
         {
-            var normalizedArg = arg.TrimStart('-', '/');
+            var normalizedArg = arg.TrimStart('-');
             foreach (var dangerous in dangerousOptions)
             {
                 if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
                     normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
                     normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                }
+            }
+        }
+        else if (arg.StartsWith('-') || arg.StartsWith('/'))
+        {
+            var normalizedArg = arg.TrimStart('-', '/');
+
+            bool isSafePrefix = false;
+            foreach (var safe in safeShortPrefixes)
+            {
+                if (normalizedArg.StartsWith(safe, StringComparison.OrdinalIgnoreCase))
+                {
+                    isSafePrefix = true;
+                    break;
+                }
+            }
+
+            if (isSafePrefix) continue;
+
+            foreach (var dangerous in dangerousOptions)
+            {
+                if (normalizedArg.Equals(dangerous, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + "=", StringComparison.OrdinalIgnoreCase) ||
+                    normalizedArg.StartsWith(dangerous + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException($"dangerous or unsupported argument: {arg}");
+                }
+            }
+
+            foreach (var dangerous in dangerousShort)
+            {
+                if (normalizedArg.StartsWith(dangerous, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new ArgumentException($"dangerous or unsupported argument: {arg}");
                 }
